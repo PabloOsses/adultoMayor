@@ -151,6 +151,7 @@ const RutinasCrear = () => {
   );
 };
 
+
 // Estilos
 const styles = StyleSheet.create({
   container: {
@@ -188,14 +189,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
 export default RutinasCrear;
-
-
-
-
-
-
-
-
 
