@@ -205,6 +205,8 @@ const RutinasCrear: React.FC<RutinasCrearProps> = ({ navigation }) => {
           </View>
         </View>
 
+
+
         {/* Selector de días */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Días de la rutina</Text>
@@ -321,5 +323,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
 });
+
+
 
 export default RutinasCrear;
