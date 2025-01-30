@@ -205,6 +205,8 @@ const RutinasCrear: React.FC<RutinasCrearProps> = ({ navigation }) => {
           </View>
         </View>
 
+
+
         {/* Selector de días */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Días de la rutina</Text>
@@ -230,6 +232,7 @@ const RutinasCrear: React.FC<RutinasCrearProps> = ({ navigation }) => {
     </KeyboardAvoidingView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -321,5 +324,6 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RutinasCrear;
 
+
+export default RutinasCrear;

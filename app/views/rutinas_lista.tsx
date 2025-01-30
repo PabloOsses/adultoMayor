@@ -1,18 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Rutina {
   id: string;
   nombre: string;
   hora: string;
-  dias: string;
+  dias: string[];
 }
 
-interface RutinasListaProps {
-  rutinas: Rutina[]; // Recibimos las rutinas como propiedad
-}
+const RutinasLista = () => {
+  const [rutinas, setRutinas] = useState<Rutina[]>([]);
 
-const RutinasLista: React.FC<RutinasListaProps> = ({ rutinas = [] }) => { // Aseguramos que 'rutinas' tenga un valor predeterminado de arreglo vacío
+  // Cargar las rutinas guardadas al iniciar
+  useEffect(() => {
+    const cargarRutinas = async () => {
+      try {
+        const rutinasGuardadas = await AsyncStorage.getItem('rutinas');
+        if (rutinasGuardadas) {
+          setRutinas(JSON.parse(rutinasGuardadas));
+        }
+      } catch (error) {
+        console.error('Error al cargar las rutinas:', error);
+      }
+    };
+
+    cargarRutinas();
+  }, []);
+
   return (
     <View style={styles.container}>
       {rutinas.length > 0 ? (
@@ -23,7 +38,7 @@ const RutinasLista: React.FC<RutinasListaProps> = ({ rutinas = [] }) => { // Ase
             <View style={styles.rutinaItem}>
               <Text style={styles.nombre}>Nombre: {item.nombre}</Text>
               <Text style={styles.datos}>Hora: {item.hora}</Text>
-              <Text style={styles.datos}>Días: {item.dias}</Text>
+              <Text style={styles.datos}>Días: {item.dias.join(', ')}</Text>
             </View>
           )}
         />
