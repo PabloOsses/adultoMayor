@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-
+//COMENTARIO
 const Index = () => {
   return (
     <View style={styles.container}>
@@ -25,25 +25,29 @@ const Index = () => {
 
       <View style={styles.row}>
         {/* Botón de Contactos */}
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#32CD32' }]}>
-          <Text style={styles.buttonText}>📇 Contactos</Text>
+        <TouchableOpacity style={[styles.button, { backgroundColor: '#32CD32' }]}
+        onPress={() => router.push('/views/rutinas_crear')}
+        >
+          <Text style={styles.buttonText}> 🔔 Crear Aviso</Text>
         </TouchableOpacity>
 
         {/* Botón de Mensajes */}
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#FFD700' }]}>
-          <Text style={styles.buttonText}>💬 Mensajes</Text>
+        <TouchableOpacity style={[styles.button, { backgroundColor: '#FFD700' }]}
+        onPress={() => router.push("/views/rutinas_lista")}
+        >
+          <Text style={styles.buttonText}>💬 Lista de Avisos</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.row}>
         {/* Botón de Notificaciones */}
         <TouchableOpacity style={[styles.button, { backgroundColor: '#8A2BE2' }]}>
-          <Text style={styles.buttonText}>🔔 Notificaciones</Text>
+          <Text style={styles.buttonText}>🔔 POR HACER</Text>
         </TouchableOpacity>
 
         {/* Botón de Ajustes Avanzados */}
         <TouchableOpacity style={[styles.button, { backgroundColor: '#DC143C' }]}>
-          <Text style={styles.buttonText}>⚙️ Ajustes</Text>
+          <Text style={styles.buttonText}>⚙️ POR HACER</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -86,3 +90,4 @@ const styles = StyleSheet.create({
 });
 
 export default Index;
+//PERAS
