@@ -49,7 +49,8 @@
     "expo-task-manager": "~12.0.5",
     "expo-av": "~15.0.2",
     "expo-background-fetch": "~13.0.5",
-    "@react-native-picker/picker": "2.9.0"
+    "@react-native-picker/picker": "2.9.0",
+    "expo-keep-awake": "~14.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

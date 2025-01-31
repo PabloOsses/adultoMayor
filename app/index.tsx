@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {useNotifications} from './servicios/useNotifications'
+
 // Configurar el manejador de notificaciones
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -14,8 +15,8 @@ Notifications.setNotificationHandler({
 
 const Index = () => {
   const router = useRouter();
-  useNotifications(); // Lógica de notificaciones separada
-
+   
+  
   return (
     <View style={styles.container}>
       <View style={styles.row}>
