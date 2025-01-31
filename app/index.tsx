@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { router } from 'expo-router';
-//COMENTARIO
+import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import {useNotifications} from './servicios/useNotifications'
+
+// Configurar el manejador de notificaciones
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true, // Mostrar una alerta
+    shouldPlaySound: true, // Reproducir un sonido
+    shouldSetBadge: false, // No mostrar un ícono de notificación
+  }),
+});
+
 const Index = () => {
+  const router = useRouter();
+   
+  
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -17,35 +31,40 @@ const Index = () => {
         {/* Botón de Llamadas Genéricas */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: '#1E90FF' }]}
-          onPress={() => router.navigate("/views/llamar", { relativeToDirectory: true })}
+          onPress={() => router.push('/views/llamar')}
         >
           <Text style={styles.buttonText}>📲 Llamar</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.row}>
-        {/* Botón de Contactos */}
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#32CD32' }]}
-        onPress={() => router.push('/views/rutinas_crear')}
+        {/* Botón de Crear Aviso */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#32CD32' }]}
+          onPress={() => router.push('/views/rutinas_crear')}
         >
-          <Text style={styles.buttonText}> 🔔 Crear Aviso</Text>
+          <Text style={styles.buttonText}>🔔 Crear Aviso</Text>
         </TouchableOpacity>
 
-        {/* Botón de Mensajes */}
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#FFD700' }]}
-        onPress={() => router.push("/views/rutinas_lista")}
+        {/* Botón de Lista de Avisos */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#FFD700' }]}
+          onPress={() => router.push('/views/rutinas_lista')}
         >
           <Text style={styles.buttonText}>💬 Lista de Avisos</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.row}>
-        {/* Botón de Notificaciones */}
-        <TouchableOpacity style={[styles.button, { backgroundColor: '#8A2BE2' }]}>
-          <Text style={styles.buttonText}>🔔 POR HACER</Text>
+        {/* Botón de Historial */}
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: '#8A2BE2' }]}
+          onPress={() => router.push('/views/rutinas_historial')}
+        >
+          <Text style={styles.buttonText}>🗓️ Historial</Text>
         </TouchableOpacity>
 
-        {/* Botón de Ajustes Avanzados */}
+        {/* Botón de Ajustes */}
         <TouchableOpacity style={[styles.button, { backgroundColor: '#DC143C' }]}>
           <Text style={styles.buttonText}>⚙️ POR HACER</Text>
         </TouchableOpacity>
@@ -90,4 +109,3 @@ const styles = StyleSheet.create({
 });
 
 export default Index;
-//PERAS
