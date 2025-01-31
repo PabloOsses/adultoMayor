@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router'; // Cambié router.push por useRouter()
+import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import {useNotifications} from './servicios/useNotifications'
+// Configurar el manejador de notificaciones
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true, // Mostrar una alerta
+    shouldPlaySound: true, // Reproducir un sonido
+    shouldSetBadge: false, // No mostrar un ícono de notificación
+  }),
+});
 
 const Index = () => {
-  const router = useRouter(); // Usamos el hook useRouter para navegación
+  const router = useRouter();
+  useNotifications(); // Lógica de notificaciones separada
 
   return (
     <View style={styles.container}>
@@ -19,7 +30,7 @@ const Index = () => {
         {/* Botón de Llamadas Genéricas */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: '#1E90FF' }]}
-          onPress={() => router.push('/views/llamar')} // Modificado para usar router.push
+          onPress={() => router.push('/views/llamar')}
         >
           <Text style={styles.buttonText}>📲 Llamar</Text>
         </TouchableOpacity>
@@ -47,7 +58,7 @@ const Index = () => {
         {/* Botón de Historial */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: '#8A2BE2' }]}
-          onPress={() => router.push('/views/rutinas_historial')} // Cambié a router.push
+          onPress={() => router.push('/views/rutinas_historial')}
         >
           <Text style={styles.buttonText}>🗓️ Historial</Text>
         </TouchableOpacity>
@@ -97,4 +108,3 @@ const styles = StyleSheet.create({
 });
 
 export default Index;
-//PERAS implementa lo que te falta en el index

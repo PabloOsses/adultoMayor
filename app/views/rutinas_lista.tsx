@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-interface Rutina {
-  id: string;
-  nombre: string;
-  hora: string;
-  dias: string[];
-}
+import {Rutina} from "../interfaces/rutina_interface";
 
 const RutinasLista = () => {
   const [rutinas, setRutinas] = useState<Rutina[]>([]);
@@ -28,6 +22,34 @@ const RutinasLista = () => {
     cargarRutinas();
   }, []);
 
+  // Función para eliminar una rutina
+  const eliminarRutina = (id: string) => {
+    Alert.alert(
+      'Eliminar Rutina',
+      '¿Estás seguro de que quieres eliminar esta rutina?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const nuevasRutinas = rutinas.filter((rutina) => rutina.id !== id);
+              await AsyncStorage.setItem('rutinas', JSON.stringify(nuevasRutinas));
+              setRutinas(nuevasRutinas);
+            } catch (error) {
+              console.error('Error al eliminar la rutina:', error);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   return (
     <View style={styles.container}>
       {rutinas.length > 0 ? (
@@ -36,14 +58,24 @@ const RutinasLista = () => {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.rutinaItem}>
-              <Text style={styles.nombre}>Nombre: {item.nombre}</Text>
-              <Text style={styles.datos}>Hora: {item.hora}</Text>
-              <Text style={styles.datos}>Días: {item.dias.join(', ')}</Text>
+              <View style={styles.rutinaInfo}>
+                <Text style={styles.nombre}>Nombre: {item.nombre}</Text>
+                <Text style={styles.datos}>Hora: {item.hora}</Text>
+                <Text style={styles.datos}>Días: {item.dias.join(', ')}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.eliminarButton}
+                onPress={() => eliminarRutina(item.id)}
+              >
+                <Text style={styles.eliminarButtonText}>X</Text>
+              </TouchableOpacity>
             </View>
           )}
         />
       ) : (
-        <Text style={styles.noRutinas}>No hay rutinas programadas.</Text>
+        <View style={styles.noRutinasContainer}>
+          <Text style={styles.noRutinas}>No hay rutinas programadas.</Text>
+        </View>
       )}
     </View>
   );
@@ -56,12 +88,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   rutinaItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
     padding: 10,
     borderWidth: 1,
     borderRadius: 5,
     borderColor: '#ddd',
     backgroundColor: '#f9f9f9',
+  },
+  rutinaInfo: {
+    flex: 1,
   },
   nombre: {
     fontSize: 18,
@@ -71,10 +109,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
   },
+  noRutinasContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   noRutinas: {
-    fontSize: 16,
+    fontSize: 24, // Aumentar el tamaño de la fuente
     color: '#888',
     textAlign: 'center',
+  },
+  eliminarButton: {
+    padding: 10,
+    backgroundColor: '#ff4444',
+    borderRadius: 5,
+  },
+  eliminarButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

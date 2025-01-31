@@ -1,10 +1,71 @@
-//ignorar, este archivo es para guardad codigo
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, ScrollView, TextInput } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  StyleSheet,
+  Platform,
+  Alert,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Checkbox from 'expo-checkbox';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
 
+// Definir una tarea en segundo plano
+const BACKGROUND_FETCH_TASK = 'background-fetch-task';
+
+TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
+  const now = new Date();
+  const rutinasGuardadas = await AsyncStorage.getItem('rutinas');
+  const rutinas = rutinasGuardadas ? JSON.parse(rutinasGuardadas) : [];
+
+  rutinas.forEach((rutina: Rutina) => {
+    const [hora, minuto] = rutina.hora.split(':');
+    const horaActual = now.getHours();
+    const minutoActual = now.getMinutes();
+
+    if (parseInt(hora, 10) === horaActual && parseInt(minuto, 10) === minutoActual) {
+      playSound();
+    }
+  });
+
+  return BackgroundFetch.BackgroundFetchResult.NewData;
+});
+
+// Configurar la tarea en segundo plano
+const registerBackgroundFetch = async () => {
+  try {
+    await BackgroundFetch.registerTaskAsync(BACKGROUND_FETCH_TASK, {
+      minimumInterval: 60, // Cada minuto
+      stopOnTerminate: false,
+      startOnBoot: true,
+    });
+  } catch (err) {
+    console.log('Error al registrar la tarea en segundo plano:', err);
+  }
+};
+
+// Reproducir sonido
+const playSound = async () => {
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      require('../../assets/sound/alarm_sound.mp3') // Asegúrate de que la ruta sea correcta
+    );
+    await sound.playAsync();
+  } catch (error) {
+    console.error('Error al reproducir el sonido:', error);
+  }
+};
+
+// Configuración de notificaciones
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -13,9 +74,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const RutinasCrear = () => {
-  const [selectedTime, setSelectedTime] = useState(new Date());
-  const [showPicker, setShowPicker] = useState(false);
+interface Rutina {
+  id: string;
+  nombre: string;
+  hora: string;
+  dias: string[];
+}
+
+interface RutinasCrearProps {
+  navigation: NavigationProp<any>;
+}
+
+const RutinasCrear: React.FC<RutinasCrearProps> = ({ navigation }) => {
+  const [hora, setHora] = useState('08');
+  const [minuto, setMinuto] = useState('00');
   const [selectedDays, setSelectedDays] = useState<{ [key: string]: boolean }>({
     lunes: false,
     martes: false,
@@ -27,11 +99,21 @@ const RutinasCrear = () => {
   });
   const [notificationMessage, setNotificationMessage] = useState('');
 
+  // Solicitar permisos al iniciar
   useEffect(() => {
-    Notifications.requestPermissionsAsync();
+    if (Platform.OS !== 'web') {
+      Notifications.requestPermissionsAsync();
+      registerBackgroundFetch();
+    }
   }, []);
 
+  // Función para programar la notificación
   const scheduleNotification = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Error', 'Las notificaciones no están disponibles en la web.');
+      return;
+    }
+
     const daysMapping: { [key: string]: number } = {
       domingo: 0,
       lunes: 1,
@@ -42,64 +124,233 @@ const RutinasCrear = () => {
       sabado: 6,
     };
 
-    Object.entries(selectedDays).forEach(async ([day, isSelected]) => {
-      if (isSelected) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Recordatorio',
-            body: notificationMessage || 'Es hora de tomar tu remedio', // Mensaje dinámico
-          },
-          trigger: {
-            hour: selectedTime.getHours(),
-            minute: selectedTime.getMinutes(),
-            weekday: daysMapping[day],
-            repeats: true,  // Se repite todos los días seleccionados
-          } as Notifications.CalendarTriggerInput,
-        });
-      }
-    });
+    const diasSeleccionados = Object.keys(selectedDays).filter((day) => selectedDays[day]);
+    if (diasSeleccionados.length === 0) {
+      Alert.alert('Error', 'Selecciona al menos un día.');
+      return;
+    }
+
+    const horaFormateada = `${hora.padStart(2, '0')}:${minuto.padStart(2, '0')}`;
+
+    const nuevaRutina: Rutina = {
+      id: Math.random().toString(),
+      nombre: notificationMessage || 'Recordatorio',
+      hora: horaFormateada,
+      dias: diasSeleccionados,
+    };
+
+    // Guardar la rutina en AsyncStorage
+    try {
+      const rutinasGuardadas = await AsyncStorage.getItem('rutinas');
+      const rutinas = rutinasGuardadas ? JSON.parse(rutinasGuardadas) : [];
+      rutinas.push(nuevaRutina);
+      await AsyncStorage.setItem('rutinas', JSON.stringify(rutinas));
+    } catch (error) {
+      console.error('Error al guardar la rutina:', error);
+    }
+
+    Alert.alert('Éxito', 'Rutina programada correctamente.');
+    navigation.goBack(); // Regresar a la pantalla anterior
+  };
+
+  // Renderizar los días seleccionables
+  const renderDaysSelector = () => {
+    return Object.keys(selectedDays).map((day) => (
+      <View key={day} style={styles.checkboxContainer}>
+        <Checkbox
+          value={selectedDays[day]}
+          onValueChange={(newValue) => setSelectedDays({ ...selectedDays, [day]: newValue })}
+          color={selectedDays[day] ? '#007AFF' : undefined}
+        />
+        <Text style={styles.dayText}>
+          {day.charAt(0).toUpperCase() + day.slice(1)}
+        </Text>
+      </View>
+    ));
+  };
+
+  // Función para incrementar o decrementar la hora o los minutos
+  const adjustTime = (type: 'hora' | 'minuto', delta: number) => {
+    if (type === 'hora') {
+      let newHora = parseInt(hora, 10) + delta;
+      if (newHora < 0) newHora = 23;
+      if (newHora > 23) newHora = 0;
+      setHora(newHora.toString().padStart(2, '0'));
+    } else {
+      let newMinuto = parseInt(minuto, 10) + delta;
+      if (newMinuto < 0) newMinuto = 59;
+      if (newMinuto > 59) newMinuto = 0;
+      setMinuto(newMinuto.toString().padStart(2, '0'));
+    }
   };
 
   return (
-    <ScrollView style={{ padding: 20, backgroundColor: 'white' }}> {/* Fondo blanco */}
-      <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Selecciona la hora</Text>
-      <Button title="Elegir hora" onPress={() => setShowPicker(true)} />
-      {showPicker && (
-        <DateTimePicker
-          value={selectedTime}
-          mode="time"
-          is24Hour={true}
-          display="default"
-          onChange={(event, date) => {
-            setShowPicker(false);
-            if (date) setSelectedTime(date);
-          }}
-        />
-      )}
-      
-      <Text style={{ fontSize: 18, fontWeight: 'bold', marginTop: 20 }}>Selecciona los días</Text>
-      {Object.keys(selectedDays).map((day) => (
-        <View key={day} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 5 }}>
-          <Checkbox
-            value={selectedDays[day]}
-            onValueChange={(newValue) => setSelectedDays({ ...selectedDays, [day]: newValue })}
-          />
-          <Text style={{ marginLeft: 10 }}>
-            {day.charAt(0).toUpperCase() + day.slice(1)} {/* Asegúrate de que el texto esté dentro de <Text> */}
-          </Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Selector de hora */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Hora de la rutina</Text>
+          <View style={styles.timePickerContainer}>
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => adjustTime('hora', 1)}
+            >
+              <Ionicons name="chevron-up" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.timeInput}
+              value={hora}
+              onChangeText={(text) => setHora(text.replace(/[^0-9]/g, '').slice(0, 2))}
+              keyboardType="numeric"
+              maxLength={2}
+            />
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => adjustTime('hora', -1)}
+            >
+              <Ionicons name="chevron-down" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            <Text style={styles.timeSeparator}>:</Text>
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => adjustTime('minuto', 1)}
+            >
+              <Ionicons name="chevron-up" size={24} color="#007AFF" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.timeInput}
+              value={minuto}
+              onChangeText={(text) => setMinuto(text.replace(/[^0-9]/g, '').slice(0, 2))}
+              keyboardType="numeric"
+              maxLength={2}
+            />
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => adjustTime('minuto', -1)}
+            >
+              <Ionicons name="chevron-down" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         </View>
-      ))}
-      
-      <TextInput
-        style={{ height: 40, borderColor: 'gray', borderWidth: 1, marginTop: 20, paddingLeft: 10 }}
-        placeholder="Escribe tu mensaje de notificación"
-        value={notificationMessage}
-        onChangeText={setNotificationMessage}
-      />
 
-      <Button title="Programar Notificación" onPress={scheduleNotification} />
-    </ScrollView>
+        {/* Selector de días */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Días de la rutina</Text>
+          {renderDaysSelector()}
+        </View>
+
+        {/* Campo de mensaje */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Mensaje de notificación</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ej: Tomar agua"
+            value={notificationMessage}
+            onChangeText={setNotificationMessage}
+          />
+        </View>
+      </ScrollView>
+
+      {/* Botón de acción */}
+      <TouchableOpacity style={styles.saveButton} onPress={scheduleNotification}>
+        <Text style={styles.saveButtonText}>Guardar Rutina</Text>
+      </TouchableOpacity>
+    </KeyboardAvoidingView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  scrollContainer: {
+    padding: 16,
+    paddingBottom: 100, // Espacio para el botón de guardar
+  },
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  timePickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeButton: {
+    padding: 8,
+  },
+  timeInput: {
+    width: 50,
+    height: 40,
+    borderColor: '#007AFF',
+    borderWidth: 1,
+    borderRadius: 8,
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#333',
+    marginHorizontal: 8,
+  },
+  timeSeparator: {
+    fontSize: 24,
+    color: '#333',
+    marginHorizontal: 8,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  dayText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+  input: {
+    height: 40,
+    borderColor: '#007AFF',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  saveButton: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  saveButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+});
 
 export default RutinasCrear;
