@@ -51,7 +51,7 @@ const Index = () => {
           style={[styles.button, { backgroundColor: '#FFD700' }]}
           onPress={() => router.push('/views/rutinas_lista')}
         >
-          <Text style={styles.buttonText}>💬 Lista de Avisos</Text>
+          <Text style={styles.buttonText}>🗓️ Lista de Avisos</Text>
         </TouchableOpacity>
       </View>
 
