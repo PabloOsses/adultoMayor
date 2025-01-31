@@ -1,329 +1,256 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TextInput,
-  StyleSheet,
-  Platform,
-  Alert,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-} from 'react-native';
-import * as Notifications from 'expo-notifications';
-import Checkbox from 'expo-checkbox';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons'; // Importar íconos
+import { useNavigation } from '@react-navigation/native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import * as Notifications from 'expo-notifications';
+import {Rutina} from "../interfaces/rutina_interface";
+import { Platform } from 'react-native';
+const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-// Configuración de notificaciones
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+const AgregarRutina = () => {
+  const [nombre, setNombre] = useState('');
+  const [hora, setHora] = useState(new Date());
+  const [diasSeleccionados, setDiasSeleccionados] = useState<string[]>([]);
+  const [mostrarTimePicker, setMostrarTimePicker] = useState(false);
+  const navigation = useNavigation();
 
-interface Rutina {
-  id: string;
-  nombre: string;
-  hora: string;
-  dias: string[];
-}
-
-interface RutinasCrearProps {
-  navigation: NavigationProp<any>;
-}
-
-const RutinasCrear: React.FC<RutinasCrearProps> = ({ navigation }) => {
-  const [hora, setHora] = useState('08');
-  const [minuto, setMinuto] = useState('00');
-  const [selectedDays, setSelectedDays] = useState<{ [key: string]: boolean }>({
-    lunes: false,
-    martes: false,
-    miercoles: false,
-    jueves: false,
-    viernes: false,
-    sabado: false,
-    domingo: false,
-  });
-  const [notificationMessage, setNotificationMessage] = useState('');
-
-  // Solicitar permisos al iniciar
-  useEffect(() => {
-    if (Platform.OS !== 'web') {
-      Notifications.requestPermissionsAsync();
-    }
-  }, []);
-
-  // Función para programar la notificación
-  const scheduleNotification = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert('Error', 'Las notificaciones no están disponibles en la web.');
+  const guardarRutina = async () => {
+    if (!nombre || !hora || diasSeleccionados.length === 0) {
+      Alert.alert('Error', 'Por favor, completa todos los campos.');
       return;
     }
-
-    const daysMapping: { [key: string]: number } = {
-      domingo: 0,
-      lunes: 1,
-      martes: 2,
-      miercoles: 3,
-      jueves: 4,
-      viernes: 5,
-      sabado: 6,
-    };
-
-    const diasSeleccionados = Object.keys(selectedDays).filter((day) => selectedDays[day]);
-    if (diasSeleccionados.length === 0) {
-      Alert.alert('Error', 'Selecciona al menos un día.');
-      return;
-    }
-
-    const horaFormateada = `${hora.padStart(2, '0')}:${minuto.padStart(2, '0')}`;
 
     const nuevaRutina: Rutina = {
-      id: Math.random().toString(),
-      nombre: notificationMessage || 'Recordatorio',
-      hora: horaFormateada,
+      id: Math.random().toString(36).substr(2, 9),
+      nombre,
+      hora: hora.toTimeString().substring(0, 5),
       dias: diasSeleccionados,
     };
 
-    // Guardar la rutina en AsyncStorage
     try {
       const rutinasGuardadas = await AsyncStorage.getItem('rutinas');
       const rutinas = rutinasGuardadas ? JSON.parse(rutinasGuardadas) : [];
       rutinas.push(nuevaRutina);
       await AsyncStorage.setItem('rutinas', JSON.stringify(rutinas));
+
+      // Programar notificaciones para cada día seleccionado
+      for (const dia of diasSeleccionados) {
+        await programarNotificacion(nuevaRutina, dia);
+      }
+
+      Alert.alert('Éxito', 'Rutina guardada correctamente.');
+      navigation.goBack();
     } catch (error) {
       console.error('Error al guardar la rutina:', error);
+      Alert.alert('Error', 'No se pudo guardar la rutina.');
     }
+  };
 
-    // Programar notificaciones para los días seleccionados
-    diasSeleccionados.forEach(async (day) => {
-      const trigger: Notifications.CalendarTriggerInput = {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        hour: parseInt(hora, 10),
-        minute: parseInt(minuto, 10),
-        weekday: daysMapping[day],
+  const programarNotificacion = async (rutina: Rutina, dia: string) => {
+    const diasSemanaMap: { [key: string]: number } = {
+      Lunes: 1,
+      Martes: 2,
+      Miércoles: 3,
+      Jueves: 4,
+      Viernes: 5,
+      Sábado: 6,
+      Domingo: 0,
+    };
+
+    const [horas, minutos] = rutina.hora.split(':').map(Number);
+
+  // Obtener la fecha actual
+  const ahora = new Date();
+  const fechaNotificacion = new Date(ahora);
+
+  // Establecer la hora de la notificación
+  fechaNotificacion.setHours(horas, minutos, 0, 0);
+
+  // Calcular el próximo día de la semana
+  const diaSemanaActual = ahora.getDay(); // 0 (Domingo) a 6 (Sábado)
+  const diaSemanaDeseado = diasSemanaMap[dia]; // 1 (Lunes) a 7 (Domingo)
+
+  // Calcular la diferencia de días
+  let diferenciaDias = diaSemanaDeseado - diaSemanaActual;
+  if (diferenciaDias < 0) {
+    diferenciaDias += 7; // Si ya pasó el día, programar para la próxima semana
+  }
+
+  // Añadir la diferencia de días a la fecha de notificación
+  fechaNotificacion.setDate(ahora.getDate() + diferenciaDias);
+
+  // Programar la notificación
+  if (Platform.OS === 'ios') {
+    // Usar trigger 'calendar' en iOS
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '¡Es hora!',
+        body: rutina.nombre,
+        sound: true,
+      },
+      trigger: {
+        type: 'calendar',
+        weekday: diaSemanaDeseado,
+        hour: horas,
+        minute: minutos,
         repeats: true,
-      };
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Recordatorio',
-          body: `${notificationMessage || 'Es hora de tu rutina'} a las ${horaFormateada}`,
-        },
-        trigger,
-      });
+      } as Notifications.NotificationTriggerInput,
     });
-
-    Alert.alert('Éxito', 'Rutina programada correctamente.');
-    navigation.goBack(); // Regresar a la pantalla anterior
+  } else {
+    // Usar trigger 'date' en Android
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '¡Es hora!',
+        body: rutina.nombre,
+        sound: true,
+      },
+      trigger: {
+        type: 'date',
+        date: fechaNotificacion, // Fecha y hora de la notificación
+        repeats: true, // Repetir semanalmente
+      } as Notifications.NotificationTriggerInput,
+    });
+  }
   };
 
-  // Renderizar los días seleccionables
-  const renderDaysSelector = () => {
-    return Object.keys(selectedDays).map((day) => (
-      <View key={day} style={styles.checkboxContainer}>
-        <Checkbox
-          value={selectedDays[day]}
-          onValueChange={(newValue) => setSelectedDays({ ...selectedDays, [day]: newValue })}
-          color={selectedDays[day] ? '#007AFF' : undefined}
-        />
-        <Text style={styles.dayText}>
-          {day.charAt(0).toUpperCase() + day.slice(1)}
-        </Text>
-      </View>
-    ));
-  };
-
-  // Función para incrementar o decrementar la hora o los minutos
-  const adjustTime = (type: 'hora' | 'minuto', delta: number) => {
-    if (type === 'hora') {
-      let newHora = parseInt(hora, 10) + delta;
-      if (newHora < 0) newHora = 23;
-      if (newHora > 23) newHora = 0;
-      setHora(newHora.toString().padStart(2, '0'));
-    } else {
-      let newMinuto = parseInt(minuto, 10) + delta;
-      if (newMinuto < 0) newMinuto = 59;
-      if (newMinuto > 59) newMinuto = 0;
-      setMinuto(newMinuto.toString().padStart(2, '0'));
+  const onChangeHora = (event: DateTimePickerEvent, selectedTime: Date | undefined) => {
+    setMostrarTimePicker(false);
+    if (selectedTime) {
+      setHora(selectedTime);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Selector de hora */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Hora de la rutina</Text>
-          <View style={styles.timePickerContainer}>
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => adjustTime('hora', -1)}
-            >
-              <Ionicons name="chevron-up" size={24} color="#007AFF" />
-            </TouchableOpacity>
-            <TextInput
-              style={styles.timeInput}
-              value={hora}
-              onChangeText={(text) => setHora(text.replace(/[^0-9]/g, '').slice(0, 2))}
-              keyboardType="numeric"
-              maxLength={2}
-            />
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => adjustTime('hora', 1)}
-            >
-              <Ionicons name="chevron-down" size={24} color="#007AFF" />
-            </TouchableOpacity>
-            <Text style={styles.timeSeparator}>:</Text>
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => adjustTime('minuto', -1)}
-            >
-              <Ionicons name="chevron-up" size={24} color="#007AFF" />
-            </TouchableOpacity>
-            <TextInput
-              style={styles.timeInput}
-              value={minuto}
-              onChangeText={(text) => setMinuto(text.replace(/[^0-9]/g, '').slice(0, 2))}
-              keyboardType="numeric"
-              maxLength={2}
-            />
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => adjustTime('minuto', 1)}
-            >
-              <Ionicons name="chevron-down" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
+    <View style={styles.container}>
+      <Text style={styles.label}>Nombre del aviso:</Text>
+      <TextInput
+        style={styles.input}
+        value={nombre}
+        onChangeText={setNombre}
+        placeholder="Ej: Tomar remedio"
+        placeholderTextColor="#888"
+      />
 
-
-
-        {/* Selector de días */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Días de la rutina</Text>
-          {renderDaysSelector()}
-        </View>
-
-        {/* Campo de mensaje */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Mensaje de notificación</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ej: Tomar agua"
-            value={notificationMessage}
-            onChangeText={setNotificationMessage}
-          />
-        </View>
-      </ScrollView>
-
-      {/* Botón de acción */}
-      <TouchableOpacity style={styles.saveButton} onPress={scheduleNotification}>
-        <Text style={styles.saveButtonText}>Guardar Rutina</Text>
+      <Text style={styles.label}>Hora:</Text>
+      <TouchableOpacity
+        style={styles.horaButton}
+        onPress={() => setMostrarTimePicker(true)}
+      >
+        <Text style={styles.horaButtonText}>
+          {hora.toTimeString().substring(0, 5)}
+        </Text>
       </TouchableOpacity>
-    </KeyboardAvoidingView>
+
+      {mostrarTimePicker && (
+        <DateTimePicker
+          value={hora}
+          mode="time"
+          display="spinner"
+          onChange={onChangeHora}
+        />
+      )}
+
+      <Text style={styles.label}>Días de la semana:</Text>
+      <View style={styles.diasContainer}>
+        {diasSemana.map((dia) => (
+          <TouchableOpacity
+            key={dia}
+            style={[
+              styles.diaButton,
+              diasSeleccionados.includes(dia) && styles.diaButtonSelected,
+            ]}
+            onPress={() => {
+              if (diasSeleccionados.includes(dia)) {
+                setDiasSeleccionados(diasSeleccionados.filter((d) => d !== dia));
+              } else {
+                setDiasSeleccionados([...diasSeleccionados, dia]);
+              }
+            }}
+          >
+            <Text style={styles.diaButtonText}>
+              {dia} {diasSeleccionados.includes(dia) ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity style={styles.guardarButton} onPress={guardarRutina}>
+        <Text style={styles.guardarButtonText}>Guardar Rutina</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    padding: 20,
+    backgroundColor: '#f9f9f9',
   },
-  scrollContainer: {
-    padding: 16,
-    paddingBottom: 100, // Espacio para el botón de guardar
-  },
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
+  label: {
+    fontSize: 20,
+    marginBottom: 15,
     fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
-  },
-  timePickerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeButton: {
-    padding: 8,
-  },
-  timeInput: {
-    width: 50,
-    height: 40,
-    borderColor: '#007AFF',
-    borderWidth: 1,
-    borderRadius: 8,
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#333',
-    marginHorizontal: 8,
-  },
-  timeSeparator: {
-    fontSize: 24,
-    color: '#333',
-    marginHorizontal: 8,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  dayText: {
-    marginLeft: 8,
-    fontSize: 16,
     color: '#333',
   },
   input: {
-    height: 40,
-    borderColor: '#007AFF',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    fontSize: 18,
+    backgroundColor: '#fff',
+  },
+  horaButton: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  horaButtonText: {
+    fontSize: 18,
     color: '#333',
   },
-  saveButton: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+  diasContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  saveButtonText: {
+  diaButton: {
+    width: '48%',
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  diaButtonSelected: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  diaButtonText: {
     fontSize: 18,
+    color: '#333',
+  },
+  guardarButton: {
+    backgroundColor: '#4CAF50',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  guardarButtonText: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFF',
   },
 });
 
-
-
-export default RutinasCrear;
+export default AgregarRutina;
